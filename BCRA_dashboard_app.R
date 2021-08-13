@@ -14,8 +14,6 @@ library(zoo)
 library(shinythemes)
 
 
-
-
 # Define UI for application
 ui <- fluidPage(
   theme = shinythemes::shinytheme("cosmo"),
@@ -69,11 +67,14 @@ server <- function(input, output) {
     )
   }
   
-  bm_resp <-  bcra_api(path = "/base")
-  rrii_resp <- bcra_api(path = "/reservas")
-  usd_resp <- bcra_api(path = "/usd")  
-  
-  
+  bm_resp <-  bcra_api(path = "/base") #Base Monetaria 
+  rrii_resp <- bcra_api(path = "/reservas") #Reservas Int
+  usd_resp <- bcra_api(path = "/usd") #Evol Tipo de Cambio
+  bm_usd <- bcra_api(path = "/base_usd") #Base Monetaria % TC
+  bm_rrii <- bcra_api(path = "/base_div_res") #base % RRII
+  merval_usd <- bcra_api(path = "/merval_usd") #Merval % USD
+
+    
   #Base Monetaria Data
   base_monetaria_data <- 
     dplyr::as_tibble(jsonlite::fromJSON(content(bm_resp, "text", encoding = "UTF-8"))) %>% 
@@ -83,9 +84,7 @@ server <- function(input, output) {
                     delta_bm = BM - lag(BM, n = 1L),
                     daily_var_bm = delta_bm / BM)
 
-
-  
-  #Reactive RRII Data
+  #RRII Data
   rrii_data <- 
     fromJSON(content(rrii_resp, "text", encoding = NULL)) %>%
       dplyr::as_tibble() %>% 
