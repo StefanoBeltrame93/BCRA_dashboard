@@ -14,7 +14,6 @@ library(zoo)
 library(shinythemes)
 
 
-#source(stringr::str_c(directory, "/API_httr_bcra_2.R"))
 
 
 # Define UI for application
