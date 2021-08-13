@@ -1,0 +1,163 @@
+#BCRA Dashboard for Monetary Policy Control
+
+rm(list = ls())
+
+#API BCRA 
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(shiny)
+library(lubridate)
+library(plotly)
+library(scales)
+library(zoo)
+library(shinythemes)
+
+
+#source(stringr::str_c(directory, "/API_httr_bcra_2.R"))
+
+
+# Define UI for application
+ui <- fluidPage(
+  theme = shinythemes::shinytheme("cosmo"),
+  tabsetPanel(
+    type = "tabs",
+    tabPanel(title = "Graficos",
+             br(),
+             titlePanel("BCRA Dashboard for Monteary Policy"),
+            br(),
+            sidebarLayout(
+              sidebarPanel(
+                selectInput(inputId = "MPInstrument",
+                            label = "Instrumento de Politica Monetaria a Visualizar",
+                            choices = c("Base Monetaria" = "base",
+                                        "Logaritmo Base Monetaria" = "log_bm",
+                                        "Reservas Internacionales" = "rrii",
+                                        "Variación diaria RRII" = "delta1_rrii")),
+                dateRangeInput(
+                  inputId = "dateRange",
+                  start = "1996-01-01",
+                  end = as.character(Sys.Date()),
+                  label = "seleccionar el rango de fechas",
+                  min = "1996-01-01",
+                  #max = as.character(max(BCRA$fecha)),
+                  weekstart = 1)
+              ),
+              
+              mainPanel(
+                titlePanel(title = "Monetary Policy main Indicators"),
+                plotlyOutput(outputId = "graphics")
+                  )
+              )
+            )
+    )
+    
+  )
+  
+
+                
+                
+
+
+
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  
+  bcra_api <- function(path){
+    url = modify_url(url = "https://api.estadisticasbcra.com", path = path)
+    GET(url, add_headers(Authorization = "bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MzAwNzcxOTEsInR5cGUiOiJleHRlcm5hbCIsInVzZXIiOiJzdGVmYW5vYmVsdHJhbWUxMkBnbWFpbC5jb20ifQ.RmpQ--4wQ3YDo5LnbAQKx7cg9yeEH1PFwcJC5pWgbexUykrRotXH58Hu_OSPGQfZnszJrjyMnkav5c3Nqi3hGg")
+    )
+  }
+  
+  bm_resp <-  bcra_api(path = "/base")
+  rrii_resp <- bcra_api(path = "/reservas")
+  usd_resp <- bcra_api(path = "/usd")  
+  
+  
+  #Base Monetaria Data
+  base_monetaria_data <- 
+    dplyr::as_tibble(jsonlite::fromJSON(content(bm_resp, "text", encoding = "UTF-8"))) %>% 
+      dplyr::rename(fecha = d, BM = v) %>% 
+      dplyr::mutate(fecha = lubridate::as_date(fecha),
+                    log_bm = log(BM),
+                    delta_bm = BM - lag(BM, n = 1L),
+                    daily_var_bm = delta_bm / BM)
+
+
+  
+  #Reactive RRII Data
+  rrii_data <- 
+    fromJSON(content(rrii_resp, "text", encoding = NULL)) %>%
+      dplyr::as_tibble() %>% 
+      dplyr::rename(fecha = d, RRII = v) %>%
+      dplyr::mutate(lag1_RRII = lag(x = RRII, n = 1L),
+                    delta1_RRII = RRII - lag1_RRII) %>%
+      replace_na(list(lag1_RRII = 0, delta1_RRII = 0)) %>%  #Me pone un 0 en el primer valor
+      dplyr::mutate(cumsum_RRII = cumsum(delta1_RRII),
+                    dailyvar_RRII = delta1_RRII / RRII,
+                    fecha = lubridate::as_date(fecha))
+  
+    
+  
+  
+  BCRA_data_base <- 
+    base_monetaria_data %>% 
+    left_join(rrii_data, by = "fecha")
+    
+  #actualDates <- seq()
+  actual_dates <- seq(from = as.Date("1996-01-01"), to = Sys.Date(), by = "day")
+  actual_dates <- as_tibble(actual_dates)
+  
+  BCRA_data_base <- 
+    actual_dates %>%
+      dplyr::rename(fecha = value) %>%
+      dplyr::left_join(BCRA_data_base, by = "fecha") %>% 
+      tidyr::fill(BM, .direction = c("down")) %>% 
+      tidyr::fill(c(BM, RRII, log_bm, delta1_RRII), .direction = c("up")) %>% 
+      dplyr::select(fecha, BM, RRII, log_bm, delta1_RRII)
+
+    
+  
+  reactive_data_date_filter <- reactive({ #generamos un reactive expresion para poder usar el "input data range"
+    dplyr::filter(BCRA_data_base, dplyr::between(fecha, input$dateRange[1], input$dateRange[2]))
+  })
+  
+  colPlotTest <- reactive({
+    if("base" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter())+ #usamos el reactive expresion
+                                                geom_line(mapping = aes(x = fecha, y = BM))+
+                                                labs(x = "fecha", y = "Base Monetaria")+
+                                                theme()))
+    
+    if("log_bm" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter())+ #usamos el reactive expresion
+                                                            geom_line(mapping = aes(x = fecha, y = log_bm))+
+                                                            labs(x = "fecha", y = "Logaritmo Base Monetaria")+
+                                                            theme()))
+    
+    if("rrii" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter()) + #usamos el reactive expresion
+                                                geom_line(mapping = aes(x = fecha, y = RRII)) +
+                                                labs(x = "fecha", y = "RR II") +
+                                                theme()))
+    
+    if("delta1_rrii" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter())+
+                                                                geom_line(mapping = aes(x = fecha, y = delta1_RRII)) +
+                                                                labs(x = "fecha", y = "Variacion Diaria RRII") +
+                                                                theme()))
+    
+  })
+  
+  output$graphics <- renderPlotly({
+    graf = colPlotTest()
+    print(graf)
+  })
+  #output$graf_RRII <- reactive(renderPlot({graf2}))
+  #output$graf_usd_convert <- reactive(renderPlot({graf3}))
+  #output$graf_varacum_RRII <- reactive(renderPlot({graf4}))
+}
+
+#https://stackoverflow.com/questions/60253265/update-stock-line-graph-based-on-daterangeinput-user-selection-shiny-app
+
+#https://stackoverflow.com/questions/49388206/reactive-daterangeinput-for-shiny
+
+# Run the application 
+shinyApp(ui = ui, server = server)
