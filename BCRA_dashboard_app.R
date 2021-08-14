@@ -21,7 +21,7 @@ ui <- fluidPage(
     type = "tabs",
     tabPanel(title = "Graficos",
              br(),
-             titlePanel("BCRA - Politica Monetaria - Performance"),
+             titlePanel("BCRA Monetary Policy Performance Dashboard"),
             br(),
             sidebarLayout(
               sidebarPanel(
@@ -37,13 +37,13 @@ ui <- fluidPage(
                   inputId = "dateRange",
                   start = "1996-01-01",
                   end = as.character(Sys.Date()),
-                  label = "seleccionar el rango de fechas",
+                  label = "Seleccionar el rango de fechas",
                   min = "1996-01-01",
                   weekstart = 1)
               ),
               
               mainPanel(
-                titlePanel(title = "Principales Indicadores"),
+                titlePanel(title = "Principales Indicadores de la Politica Monetaria"),
                 plotlyOutput(outputId = "graphics")
                   )
               )
