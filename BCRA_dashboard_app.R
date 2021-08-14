@@ -21,7 +21,7 @@ ui <- fluidPage(
     type = "tabs",
     tabPanel(title = "Graficos",
              br(),
-             titlePanel("BCRA - Politica Monetaria"),
+             titlePanel("BCRA - Politica Monetaria - Performance"),
             br(),
             sidebarLayout(
               sidebarPanel(
@@ -39,7 +39,6 @@ ui <- fluidPage(
                   end = as.character(Sys.Date()),
                   label = "seleccionar el rango de fechas",
                   min = "1996-01-01",
-                  #max = as.character(max(BCRA$fecha)),
                   weekstart = 1)
               ),
               
@@ -151,7 +150,7 @@ server <- function(input, output) {
     dplyr::filter(BCRA_data_base, dplyr::between(fecha, input$dateRange[1], input$dateRange[2]))
   })
   
-  colPlotTest <- reactive({
+  reactive_plots <- reactive({
     if("base" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter())+ #usamos el reactive expresion
                                                 geom_line(mapping = aes(x = fecha, y = BM))+
                                                 labs(x = "fecha", y = "Base Monetaria")+
@@ -184,7 +183,7 @@ server <- function(input, output) {
   })
   
   output$graphics <- renderPlotly({
-    graf = colPlotTest()
+    graf = reactive_plots()
     print(graf)
   })
   #output$graf_RRII <- reactive(renderPlot({graf2}))
