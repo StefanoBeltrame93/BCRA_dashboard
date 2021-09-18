@@ -22,7 +22,7 @@ ui <- fluidPage(
     tabPanel(title = "Graficos",
              br(),
              titlePanel("BCRA Monetary Policy Performance Dashboard"),
-            br(),
+             br(),
             sidebarLayout(
               sidebarPanel(
                 selectInput(inputId = "MPInstrument",
@@ -44,7 +44,10 @@ ui <- fluidPage(
               
               mainPanel(
                 titlePanel(title = "Principales Indicadores de la Politica Monetaria"),
-                plotlyOutput(outputId = "graphics")
+                plotlyOutput(outputId = "graphics"),
+                br(),
+                titlePanel("Key Monetary Indicators - Últimos Datos"),
+                tableOutput(outputId = "kmi_last")
                   )
               )
             )
@@ -61,10 +64,13 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+
+#Generamos un nuevo token. Valido hasta 2022-09-18
+acces_token <- c("eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjM0OTI3MDEsInR5cGUiOiJleHRlcm5hbCIsInVzZXIiOiJzdGVmYW5vYmVsdHJhbWUxMkBnbWFpbC5jb20ifQ.0-MqI4-TxscsDrNC0NRKr-Pkx_iGu4QOt2Sd3yeLQogHjTyOOb5dt48A6Yt-JAV6lyz35eWltm99nGFEz9CSSQ")
   
   bcra_api <- function(path){
     url = modify_url(url = "https://api.estadisticasbcra.com", path = path)
-    GET(url, add_headers(Authorization = "bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MzAwNzcxOTEsInR5cGUiOiJleHRlcm5hbCIsInVzZXIiOiJzdGVmYW5vYmVsdHJhbWUxMkBnbWFpbC5jb20ifQ.RmpQ--4wQ3YDo5LnbAQKx7cg9yeEH1PFwcJC5pWgbexUykrRotXH58Hu_OSPGQfZnszJrjyMnkav5c3Nqi3hGg")
+    GET(url, add_headers(Authorization = stringr::str_c("bearer", " ", acces_token))
     )
   }
   
@@ -79,11 +85,11 @@ server <- function(input, output) {
   #Base Monetaria Data
   base_monetaria_data <- 
     dplyr::as_tibble(jsonlite::fromJSON(content(bm_resp, "text", encoding = "UTF-8"))) %>% 
-      dplyr::rename(fecha = d, BM = v) %>% 
-      dplyr::mutate(fecha = lubridate::as_date(fecha),
-                    log_bm = log(BM),
-                    delta_bm = BM - lag(BM, n = 1L),
-                    daily_var_bm = delta_bm / BM)
+    dplyr::rename(fecha = d, BM = v) %>% 
+    dplyr::mutate(fecha = lubridate::as_date(fecha),
+                  log_bm = log(BM),
+                  delta_bm = BM - lag(BM, n = 1L),
+                  daily_var_bm = delta_bm / BM)
 
   #RRII Data
   rrii_data <- 
@@ -121,11 +127,7 @@ server <- function(input, output) {
     dplyr::mutate(cumsum_merval_usd = cumsum(delta1_merval_usd),
                   dailyvar_merval_usd = delta1_merval_usd / merval_usd,
                   fecha = lubridate::as_date(fecha))
-   
-  
-    
-  
-  
+
   BCRA_data_base <- 
     base_monetaria_data %>% 
     left_join(rrii_data, by = "fecha") %>% 
@@ -144,7 +146,16 @@ server <- function(input, output) {
       tidyr::fill(c(BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd), .direction = c("up")) %>% 
       dplyr::select(fecha, BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd)
 
-    
+
+BCRA_historical_monthly_data <- 
+  BCRA_data_base %>% 
+  dplyr::filter(fecha == lubridate::floor_date(fecha, unit = "month"))
+
+BCRA_last_data <- 
+  BCRA_historical_monthly_data %>%
+  dplyr::filter(fecha == max(fecha)) #%>% 
+  #mutate(fecha = as_date(fecha))
+  
   
   reactive_data_date_filter <- reactive({ #generamos un reactive expresion para poder usar el "input data range"
     dplyr::filter(BCRA_data_base, dplyr::between(fecha, input$dateRange[1], input$dateRange[2]))
@@ -189,6 +200,11 @@ server <- function(input, output) {
   #output$graf_RRII <- reactive(renderPlot({graf2}))
   #output$graf_usd_convert <- reactive(renderPlot({graf3}))
   #output$graf_varacum_RRII <- reactive(renderPlot({graf4}))
+  
+  output$kmi_last <- 
+    renderTable({
+      BCRA_last_data}, width = "100%", res = 96)
+  
 }
 
 #https://stackoverflow.com/questions/60253265/update-stock-line-graph-based-on-daterangeinput-user-selection-shiny-app
