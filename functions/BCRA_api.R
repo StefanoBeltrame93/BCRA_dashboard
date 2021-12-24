@@ -1,6 +1,6 @@
 
 #BCRA API data extration and manipulation for later use
-bcra_data_extraction = function(token){
+bcra_data_extraction = function(acces_token){
   acces_token <- c("eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjM1MTE3MTYsInR5cGUiOiJleHRlcm5hbCIsInVzZXIiOiJzdGVmYW5vYmVsdHJhbWUxMkBnbWFpbC5jb20ifQ.mrM0ox2paudKGjTgoxrFDh4nSIqcPzQ3yoV_pGNYl7h2Tdx7FdiG_gdvBg9qD1nyPu28Ho3uVBRGwzQKJqDSpw")
   
   bcra_api <- function(path){
