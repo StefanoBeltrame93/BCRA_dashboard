@@ -1,6 +1,6 @@
 
 #BCRA API data extration and manipulation for later use
-bcra_data_extraction = function(acces_token){
+bcra_data_extraction = function(token){
   acces_token <- c("eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NjM1MTE3MTYsInR5cGUiOiJleHRlcm5hbCIsInVzZXIiOiJzdGVmYW5vYmVsdHJhbWUxMkBnbWFpbC5jb20ifQ.mrM0ox2paudKGjTgoxrFDh4nSIqcPzQ3yoV_pGNYl7h2Tdx7FdiG_gdvBg9qD1nyPu28Ho3uVBRGwzQKJqDSpw")
   
   bcra_api <- function(path){
@@ -15,10 +15,10 @@ bcra_data_extraction = function(acces_token){
   bm_usd_resp <- bcra_api(path = "/base_usd") #Base Monetaria % TC
   bm_rrii_resp <- bcra_api(path = "/base_div_res") #base % RRII
   merval_usd_resp <- bcra_api(path = "/merval_usd") #Merval % USD
+  tasa_30d_resp <- bcra_api(path = "/tasa_depositos_30_dias") #tasa 30d
   
   
-  fromJSON(content(bm_resp, "text", encoding = "UTF-8"))
-  #Base Monetaria Data
+  #1. Base Monetaria Data ####
   base_monetaria_data <- 
     dplyr::as_tibble(jsonlite::fromJSON(content(bm_resp, "text", encoding = "UTF-8"))) %>% 
     dplyr::rename(fecha = d, BM = v) %>% 
@@ -27,7 +27,19 @@ bcra_data_extraction = function(acces_token){
                   delta_bm = BM - lag(BM, n = 1L),
                   daily_var_bm = delta_bm / BM)
   
-  #RRII Data
+  #2. Tasa 30 dias Data ####
+  tasa_30d_data <- 
+    dplyr::as_tibble(jsonlite::fromJSON(content(tasa_30d_resp, "text", encoding = "UTF-8"))) %>% 
+    dplyr::rename(fecha = d, tasa_30d = v) %>%
+    dplyr::mutate(fecha = lubridate::as_date(fecha),
+                  tasa_30d = tasa_30d / 100,
+                  tasa_30d_anualizada = (1+tasa_30d)^12 - 1)
+  
+  #2.1 Tasa UVA
+  
+    
+  
+  #3. RRII Data Data ####
   rrii_data <- 
     fromJSON(content(rrii_resp, "text", encoding = NULL)) %>%
     dplyr::as_tibble() %>% 
@@ -68,8 +80,8 @@ bcra_data_extraction = function(acces_token){
     base_monetaria_data %>% 
     left_join(rrii_data, by = "fecha") %>% 
     left_join(bm_usd_data, by = "fecha") %>% 
-    left_join(merval_usd_data, by = "fecha")
+    left_join(merval_usd_data, by = "fecha") %>% 
+    left_join(tasa_30d_data, by = "fecha")
   
     
 }
-

@@ -35,7 +35,8 @@ ui <- fluidPage(
                                          "Base Monetaria en USD Corrientes" = "bm_usd",
                                          "Reservas Internacionales" = "rrii",
                                          "Variación diaria RRII" = "delta1_rrii",
-                                         "Indice MERVAL en USD" = "merval_usd")),
+                                         "Indice MERVAL en USD" = "merval_usd",
+                                         "Tasa 30d en Pesos" = "tasa_30d")),
                  dateRangeInput(
                    inputId = "dateRange",
                    start = "1996-01-01",
@@ -76,8 +77,8 @@ server <- function(input, output) {
     dplyr::rename(fecha = value) %>%
     dplyr::left_join(BCRA_data_base, by = "fecha") %>% #usamos el data frame que generamos con la funcion
     tidyr::fill(BM, .direction = c("down")) %>% 
-    tidyr::fill(c(BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd), .direction = c("up")) %>% 
-    dplyr::select(fecha, BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd)
+    tidyr::fill(c(BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd, tasa_30d), .direction = c("up")) %>% 
+    dplyr::select(fecha, BM, RRII, log_bm, delta1_RRII, bm_usd, delta1_bm_usd, merval_usd, delta1_merval_usd, tasa_30d)
   
   
   BCRA_historical_monthly_data <- 
@@ -86,7 +87,8 @@ server <- function(input, output) {
   
   BCRA_last_data <- 
     BCRA_historical_monthly_data %>% 
-    dplyr::filter(fecha == max(fecha))
+    dplyr::filter(fecha == max(fecha)) %>% 
+    dplyr::mutate(fecha = as.Date(fecha, origin = "1070-01-01"))
   
   reactive_data_date_filter <- reactive({ #generamos un reactive expresion para poder usar el "input data range"
     dplyr::filter(BCRA_data_base, dplyr::between(fecha, input$dateRange[1], input$dateRange[2]))
@@ -122,6 +124,10 @@ server <- function(input, output) {
                                                                 labs(x = "fecha", y = "Variacion Diaria RRII") +
                                                                 theme()))
     
+  if("tasa_30d" %in% input$MPInstrument) return(ggplotly(ggplot(data = reactive_data_date_filter()) +
+                                                           geom_line(mapping = aes(x = fecha, y = tasa_30d)) + 
+                                                           labs(x = "fecha", y = "Tasa a 30d")))
+    
   })
   
   output$graphics <- renderPlotly({
@@ -133,8 +139,7 @@ server <- function(input, output) {
   #output$graf_varacum_RRII <- reactive(renderPlot({graf4}))
   
   output$kmi_last <- 
-    renderTable({
-      BCRA_last_data}, width = "100%", res = 96)
+    renderTable({BCRA_last_data}, width = "100%", res = 96)
   
 }
 
